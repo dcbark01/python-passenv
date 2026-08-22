@@ -1,11 +1,33 @@
 #:schema https://www.schemastore.org/prek.json
 # Git hooks for python-passenv, managed by prek (https://prek.j178.dev).
 #
-#   uv run prek install          # install the pre-commit hook
+#   uv run prek install          # install the pre-commit and commit-msg hooks
 #   uv run prek run --all-files  # run everything by hand
 
 minimum_prek_version = "0.4.14"
-default_install_hook_types = ["pre-commit"]
+default_install_hook_types = ["pre-commit", "commit-msg"]
+# Everything except the commit-message check belongs to `pre-commit`; without
+# this every hook is also offered the commit message and reports a skip.
+default_stages = ["pre-commit"]
+
+# ---------------------------------------------------------------------------
+# Commit messages. Releases are cut from Conventional Commits by
+# python-semantic-release, so a malformed subject line is not a style nit: it
+# silently drops the change out of the changelog and out of the version bump.
+# The accepted types are exactly the ones its `conventional` parser allows.
+# `Merge`/`Revert`/`fixup!`/`squash!` are git's own wording and are let through.
+# ---------------------------------------------------------------------------
+
+[[repos]]
+repo = "builtin"
+hooks = [
+    { id = "require-pattern", name = "conventional commit message", stages = [
+        "commit-msg",
+    ], args = [
+        "--",
+        "^((build|chore|ci|docs|feat|fix|perf|refactor|style|test)(\\([^)]+\\))?!?: .+|Merge |Revert |fixup!|squash!)",
+    ] },
+]
 
 [[repos]]
 repo = "https://github.com/betterleaks/betterleaks"

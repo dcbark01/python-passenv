@@ -60,6 +60,19 @@ jobs:
       - run: uv sync --group dev
       - run: uv run pytest --cov=passenv --cov-report=term-missing
 
+  build:
+    name: build artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      # The release workflow builds the very same artifacts; failing here means
+      # failing after a version has already been tagged, so check it on the PR.
+      - run: uv build
+      - run: uvx twine check --strict dist/*
+
   integration:
     name: integration (real pass + gpg)
     runs-on: ubuntu-latest

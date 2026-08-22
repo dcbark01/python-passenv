@@ -1,0 +1,148 @@
+name: Release
+
+# Every push to `main` is a release candidate. python-semantic-release reads the
+# Conventional Commits since the last tag and decides whether there is anything
+# to release: `feat` -> minor, `fix`/`perf` -> patch, `!`/`BREAKING CHANGE` ->
+# major (minor while the package is 0.x). Anything else releases nothing.
+#
+# The manual trigger exists for two cases: a dry run to see what *would* happen,
+# and forcing a bump the commit history would not produce on its own (notably
+# the very first release).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Report the next version without tagging, releasing or publishing"
+        type: boolean
+        default: false
+      force:
+        description: "Force a bump level instead of deriving it from the commits"
+        type: choice
+        default: auto
+        options: [auto, patch, minor, major]
+      prerelease:
+        description: "Cut a prerelease (0.2.0-rc.1) instead of a final version"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Releases must never overlap, and must never be cancelled halfway through:
+# a run that is killed between `git push` and the PyPI upload leaves a tag
+# with no artifact behind it.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # The pull request that produced this commit ran the full matrix. This is the
+  # last line of defence before something is tagged and published for good.
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: true
+      - run: uv sync --group dev
+      - run: uv run prek run --all-files --show-diff-on-failure
+      - run: uv run pytest
+      # Catches packaging breakage (missing py.typed, bad metadata) before a
+      # version number is burned on it.
+      - run: uv build
+      - name: Check the built metadata
+        run: uvx twine check --strict dist/*
+
+  release:
+    name: version, tag & GitHub release
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      released: ${{ steps.release.outputs.released }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      # `build: false` — the action image is a plain python:slim, so building
+      # there would mean trusting whatever pip/build it happens to carry. The
+      # artifacts job below builds from the tag with the project's own uv.
+      - name: Determine version, update changelog, tag and release
+        id: release
+        uses: python-semantic-release/python-semantic-release@39dd2052f2ce8282a5d932c31d58a2ca06d2550e # v10.6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          git_committer_name: github-actions[bot]
+          git_committer_email: 41898282+github-actions[bot]@users.noreply.github.com
+          build: false
+          no_operation_mode: ${{ inputs.dry_run || 'false' }}
+          force: ${{ (inputs.force != 'auto' && inputs.force) || '' }}
+          prerelease: ${{ inputs.prerelease || '' }}
+
+  artifacts:
+    name: build & attach artifacts
+    needs: release
+    if: needs.release.outputs.released == 'true' && !inputs.dry_run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # The tag, not the branch: another push may already have landed on main.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: true
+      - run: uv build
+      - run: uvx twine check --strict dist/*
+
+      - name: Fail if the built version is not the released one
+        env:
+          EXPECTED: ${{ needs.release.outputs.version }}
+        run: |
+          test -f "dist/python_passenv-${EXPECTED}-py3-none-any.whl" \
+            || { echo "::error::dist/ does not contain version ${EXPECTED}"; ls -1 dist; exit 1; }
+
+      - name: Attach to the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ needs.release.outputs.tag }}" dist/* --clobber
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dist-${{ needs.release.outputs.version }}
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: publish to PyPI
+    needs: [release, artifacts]
+    if: needs.release.outputs.released == 'true' && !inputs.dry_run
+    runs-on: ubuntu-latest
+    # Trusted Publishing: PyPI verifies this workflow's OIDC identity, so there
+    # is no API token stored anywhere. The environment name is part of that
+    # identity and must match the publisher configured on PyPI.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/python-passenv
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dist-${{ needs.release.outputs.version }}
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        with:
+          packages-dir: dist/
+          print-hash: true

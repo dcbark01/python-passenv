@@ -163,7 +163,7 @@ it never clobbers a variable that is already set.
 
 ```bash
 uv sync --group dev
-uv run prek install           # install the git hooks (once per clone)
+uv run prek install           # install the pre-commit and commit-msg hooks (once per clone)
 uv run ruff check . && uv run ruff format --check . && uv run pyrefly check
 uv run pytest                 # unit tests, no gpg required
 uv run pytest -m integration  # real pass + gpg, ephemeral key and store
@@ -199,6 +199,21 @@ uv run prek auto-update       # bump pinned hook revisions
 CI runs the same hooks via `prek run --all-files`. Since the `betterleaks` hook only
 inspects staged changes, a separate CI job scans the full history with the pinned
 betterleaks image.
+
+### Commit messages
+
+Commit subjects follow [Conventional Commits](https://www.conventionalcommits.org/),
+because the release version is computed from them — `feat:` bumps the minor, `fix:` and
+`perf:` bump the patch, everything else releases nothing. A `commit-msg` hook rejects
+subjects that do not parse. See [RELEASING.md](RELEASING.md).
+
+## Releasing
+
+Merging to `main` is the release. python-semantic-release reads the commits since the
+last tag, bumps the version, writes the changelog, tags, cuts a GitHub Release with the
+sdist and wheel attached, and publishes to PyPI via Trusted Publishing — or does nothing
+at all, if nothing releasable landed. Details, including the dry-run and forced-bump
+triggers, are in [RELEASING.md](RELEASING.md).
 
 ## Not in v1
 
