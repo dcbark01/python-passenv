@@ -10,6 +10,21 @@ commit messages, not this file.
 
 <!-- version list -->
 
+## v0.1.1 (2026-08-22)
+
+### Continuous Integration
+
+- Add a semantic-release driven release pipeline
+  ([#2](https://github.com/dcbark01/python-passenv/pull/2),
+  [`b329b63`](https://github.com/dcbark01/python-passenv/commit/b329b63fd60adb90cf71ea9d6cd237cb0498aaa8))
+
+### Documentation
+
+- Drop the Not in v1 section from the readme
+  ([#3](https://github.com/dcbark01/python-passenv/pull/3),
+  [`b648caf`](https://github.com/dcbark01/python-passenv/commit/b648caf325e8f02033a95d100b2611c9170c2840))
+
+
 ## v0.1.0 (2026-08-21)
 
 ### Added
