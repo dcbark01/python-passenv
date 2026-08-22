@@ -33,8 +33,15 @@ jobs:
         with:
           fetch-depth: 0
       - name: Scan the whole history with betterleaks
+        # The checkout is owned by the runner user but the container runs as
+        # root, which trips git's dubious-ownership guard. GIT_CONFIG_* marks
+        # the bind mount safe without depending on either UID.
         run: |
-          docker run --rm -v "$PWD:/repo" ghcr.io/betterleaks/betterleaks:v1.8.1 \
+          docker run --rm -v "$PWD:/repo" \
+            -e GIT_CONFIG_COUNT=1 \
+            -e GIT_CONFIG_KEY_0=safe.directory \
+            -e GIT_CONFIG_VALUE_0=/repo \
+            ghcr.io/betterleaks/betterleaks:v1.8.1 \
             git /repo --redact --verbose
 
   unit:
