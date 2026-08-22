@@ -1,0 +1,15 @@
+# SHA-pinned actions cannot be updated by watching a tag, so something has to
+# propose the bumps or the pins quietly rot. Dependabot rewrites the SHA and the
+# trailing `# vX` comment together, and the pull request goes through the same
+# checks as any other change.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
