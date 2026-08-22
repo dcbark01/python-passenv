@@ -44,6 +44,11 @@ dev = [
     "pyrefly>=0.16",
     "prek>=0.4.14",
 ]
+# Kept out of `dev` so the test matrix does not pay to install it. Used by the
+# release workflow's dry run and by `uv run --group release semantic-release`.
+release = [
+    "python-semantic-release>=10.6,<11",
+]
 
 [tool.ruff]
 line-length = 100
@@ -62,3 +67,40 @@ markers = [
     "integration: end-to-end tests requiring real `pass` and `gpg` binaries",
 ]
 addopts = "-m 'not integration'"
+
+# ---------------------------------------------------------------------------
+# Release automation. Versions are derived from Conventional Commits on `main`
+# by python-semantic-release; nothing here should be edited by hand at release
+# time. See RELEASING.md.
+# ---------------------------------------------------------------------------
+
+[tool.semantic_release]
+# The version string lives in two places; both are rewritten on every release.
+version_toml = ["pyproject.toml:project.version"]
+version_variables = ["src/passenv/__init__.py:__version__"]
+tag_format = "v{version}"
+commit_parser = "conventional"
+commit_message = "chore(release): v{version} [skip ci]"
+# While the package is 0.x, a breaking change bumps the minor rather than
+# jumping to 1.0.0. Flip both of these when 1.0.0 is deliberate.
+allow_zero_version = true
+major_on_zero = false
+# Only used by a local `semantic-release version`. In CI the artifacts are
+# built by a separate job from the tagged commit, with the same uv that the
+# test matrix uses, rather than by whatever Python the action image ships.
+build_command = "uv build"
+
+[tool.semantic_release.branches.main]
+match = "^main$"
+prerelease = false
+
+[tool.semantic_release.changelog]
+mode = "update"
+insertion_flag = "<!-- version list -->"
+# The release commit itself is not news.
+exclude_commit_patterns = ['''^chore\(release\): ''']
+
+[tool.semantic_release.changelog.default_templates]
+changelog_file = "CHANGELOG.md"
+output_format = "md"
+mask_initial_release = true
