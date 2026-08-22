@@ -215,10 +215,6 @@ sdist and wheel attached, and publishes to PyPI via Trusted Publishing — or do
 at all, if nothing releasable landed. Details, including the dry-run and forced-bump
 triggers, are in [RELEASING.md](RELEASING.md).
 
-## Not in v1
-
-`set_key` / `unset_key`, a CLI, `$VAR` interpolation, and dotenv-format-inside-an-entry.
-
 ## License
 
 MIT — see [LICENSE](LICENSE).
