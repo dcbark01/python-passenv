@@ -1,0 +1,75 @@
+#:schema https://www.schemastore.org/prek.json
+# Git hooks for python-passenv, managed by prek (https://prek.j178.dev).
+#
+#   uv run prek install          # install the pre-commit hook
+#   uv run prek run --all-files  # run everything by hand
+
+minimum_prek_version = "0.4.14"
+default_install_hook_types = ["pre-commit"]
+
+[[repos]]
+repo = "https://github.com/betterleaks/betterleaks"
+rev = "v1.8.1"
+hooks = [{ id = "betterleaks", fail_fast = true }]
+
+[[repos]]
+repo = "builtin"
+hooks = [
+    { id = "detect-private-key", fail_fast = true },
+    { id = "deny-filename-pattern", name = "deny secret-bearing filenames", fail_fast = true, args = [
+        "--ignore-case",
+        "--",
+        "\\.(gpg|asc|pem|p12|pfx|key|kdbx|jks)$",
+        "^\\.env($|\\.)",
+        "^\\.secrets$",
+        "^id_(rsa|dsa|ecdsa|ed25519)$",
+        "^\\.netrc$",
+        "^\\.pypirc$",
+        "^credentials(\\.json)?$",
+    ] },
+    { id = "deny-filename-pattern", name = "deny password-store paths", fail_fast = true, alias = "deny-store-paths", files = "(^|/)(\\.password-store|\\.gnupg)/", args = [
+        "--",
+        ".",
+    ] },
+]
+
+# ---------------------------------------------------------------------------
+# General hygiene.
+# ---------------------------------------------------------------------------
+
+[[repos]]
+repo = "builtin"
+hooks = [
+    { id = "trailing-whitespace" },
+    { id = "end-of-file-fixer" },
+    { id = "mixed-line-ending", args = ["--fix=lf"] },
+    { id = "check-added-large-files" },
+    { id = "check-case-conflict" },
+    { id = "check-merge-conflict" },
+    { id = "check-symlinks" },
+    { id = "check-toml" },
+    { id = "check-yaml" },
+]
+
+# ---------------------------------------------------------------------------
+# Lint, format and type check. Driven through `uv run` so the versions come
+# from the dev dependency group and stay in step with CI.
+# ---------------------------------------------------------------------------
+
+[[repos]]
+repo = "local"
+hooks = [
+    { id = "ruff-check", name = "ruff check", entry = "uv run ruff check --force-exclude --fix --exit-non-zero-on-fix", language = "system", types_or = [
+        "python",
+        "pyi",
+    ], require_serial = true },
+    { id = "ruff-format", name = "ruff format", entry = "uv run ruff format --force-exclude", language = "system", types_or = [
+        "python",
+        "pyi",
+    ], require_serial = true },
+    { id = "pyrefly", name = "pyrefly check", entry = "uv run pyrefly check", language = "system", types_or = [
+        "python",
+        "pyi",
+        "toml",
+    ], pass_filenames = false, require_serial = true },
+]
