@@ -36,12 +36,16 @@ jobs:
         # The checkout is owned by the runner user but the container runs as
         # root, which trips git's dubious-ownership guard. GIT_CONFIG_* marks
         # the bind mount safe without depending on either UID.
+        #
+        # The image is pinned by digest, not by `:v1.8.1`: a tag can be moved,
+        # and this scan is a control. (The comment lives here rather than
+        # inside the command — a `#` line between backslash-continued lines is
+        # swallowed by the continuation and comments out the rest.)
         run: |
           docker run --rm -v "$PWD:/repo" \
             -e GIT_CONFIG_COUNT=1 \
             -e GIT_CONFIG_KEY_0=safe.directory \
             -e GIT_CONFIG_VALUE_0=/repo \
-            # v1.8.1; a tag can be moved, a digest cannot.
             ghcr.io/betterleaks/betterleaks@sha256:8b9d12db5e11ca798029da44923503de5d8cfff6992cffaaa6722fbeb9fc7797 \
             git /repo --redact --verbose
 
