@@ -84,6 +84,9 @@ load_passenv(["shared", "project_a"])   # merged; project_a wins on conflicts
   variable raise `KeyCollisionError` — detected before anything is decrypted.
 - **Layering across namespaces is fine.** Later namespaces override earlier ones, and
   the merge is resolved *before* anything is written to `os.environ`.
+- **Environment assignments are validated first.** `load_passenv` rejects empty names,
+  names containing `=` or null bytes, and values containing null bytes with `PassEnvError`
+  before writing any variables. `passenv_values` still returns an ordinary dictionary.
 - **Only `*.gpg` files count.** Dotfiles and dot-directories (`.git`, `.gpg-id`,
   `.extensions`) are skipped.
 
