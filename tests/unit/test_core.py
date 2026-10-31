@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from passenv import get_key, load_passenv, passenv_values
-from passenv.errors import KeyCollisionError, NamespaceNotFoundError
+from passenv.errors import KeyCollisionError, NamespaceNotFoundError, PassEnvError
 
 
 @pytest.fixture
@@ -117,6 +117,13 @@ class TestPassenvValues:
             )
         assert excinfo.value.key == "API_TOKEN"
 
+    def test_dictionary_values_need_not_be_environment_variables(
+        self, store: Path, make_entry, fake_pass
+    ) -> None:
+        make_entry("ns/m=n")
+        fake_pass.contents["ns/m=n"] = "value\n"
+        assert passenv_values("ns", store_dir=store) == {"M=N": "value"}
+
     def test_missing_namespace_returns_empty_by_default(self, store: Path) -> None:
         assert passenv_values("absent", store_dir=store) == {}
 
@@ -143,6 +150,43 @@ class TestPassenvValues:
 
 
 class TestLoadPassenv:
+    @pytest.mark.parametrize("invalid_key", ["M=N", "", "M\0N"])
+    def test_invalid_names_leave_environment_unchanged(
+        self, store: Path, make_entry, fake_pass, invalid_key: str
+    ) -> None:
+        make_entry("ns/aaa")
+        make_entry("ns/invalid")
+        fake_pass.contents.update({"ns/aaa": "new-value\n", "ns/invalid": "secret\n"})
+        before = dict(os.environ)
+        with pytest.raises(PassEnvError, match="invalid environment variable name"):
+            load_passenv(
+                "ns",
+                key_transform=lambda leaf: invalid_key if leaf == "invalid" else "AAA",
+                override=True,
+                store_dir=store,
+            )
+        assert dict(os.environ) == before
+
+    def test_null_value_leaves_environment_unchanged(
+        self, store: Path, make_entry, fake_pass
+    ) -> None:
+        make_entry("ns/aaa")
+        make_entry("ns/zzz")
+        fake_pass.contents.update({"ns/aaa": "new-value\n", "ns/zzz": "secret\0value\n"})
+        before = dict(os.environ)
+        with pytest.raises(PassEnvError, match="value for 'ZZZ' contains a null byte"):
+            load_passenv("ns", override=True, store_dir=store)
+        assert dict(os.environ) == before
+
+    def test_invalid_value_is_ignored_when_existing_variable_is_kept(
+        self, store: Path, make_entry, fake_pass, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        make_entry("ns/token")
+        fake_pass.contents["ns/token"] = "secret\0value\n"
+        monkeypatch.setenv("TOKEN", "existing")
+        assert load_passenv("ns", store_dir=store) is True
+        assert os.environ["TOKEN"] == "existing"
+
     def test_sets_variables_and_returns_true(
         self, store: Path, populated, monkeypatch: pytest.MonkeyPatch
     ) -> None:

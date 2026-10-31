@@ -8,7 +8,7 @@ from collections.abc import Callable, Sequence
 
 from . import _pass
 from ._store import iter_entries, normalize_entry, resolve_store_dir
-from .errors import KeyCollisionError, NamespaceNotFoundError
+from .errors import KeyCollisionError, NamespaceNotFoundError, PassEnvError
 
 __all__ = ["get_key", "load_passenv", "logger", "passenv_values"]
 
@@ -111,6 +111,14 @@ def load_passenv(
         required=required,
         store_dir=store_dir,
     )
+
+    for key, value in values.items():
+        if not override and key in os.environ:
+            continue
+        if not key or "=" in key or "\0" in key:
+            raise PassEnvError(f"invalid environment variable name {key!r}")
+        if "\0" in value:
+            raise PassEnvError(f"value for {key!r} contains a null byte")
 
     for key, value in values.items():
         if not override and key in os.environ:
